@@ -1,28 +1,24 @@
 import re
-import nltk
 import spacy
-# from nltk.corpus import stopwords
-# from nltk.tokenize import sent_tokenize
-# from nltk.tokenize import word_tokenize
-# from nltk.stem import WordNetLemmatizer
-# nltk.download('averaged_perceptron_tagger')
-# nltk.download('stopwords')
-# nltk.download('punkt')
-# stop = stopwords.words('english')
 # python -m spacy download en_core_web_sm
 # python -m spacy download en_core_web_lg
 
 example = """
 On Wednesday, March 18th I called John to let him know that he had a package from Maria that 
 arrived on 3/17. Later, I received a message from him saying that he received the package from 
-her on Thursday.
+her on Thursday. Maria's husband is caring for their children right now. John's wife works with 
+babies.
 """
 
 def wordTokenize(text):
-
+    # Create an empty list to store the word tokens
     wordTok = []
+
+    # Use spacy to word tokenize the text
     nlp = spacy.load("en_core_web_sm")
     doc = nlp(text)
+
+    # Iteratively store the word tokens to wordTok
     for token in doc:
         wordTok.append(token.text)
 
@@ -79,7 +75,7 @@ def getGenderedEntities(text):
     cleanText = cleanText.replace('\t', '')
 
     # Create string of gendered pronouns
-    genderPronouns = "he she"
+    genderPronouns = "he she man woman"
 
     # Use spacy to perform word tokenization on the cleaned text
     nlp = spacy.load("en_core_web_lg")
@@ -110,9 +106,57 @@ def getGenderedEntities(text):
 
     return redactions
 
+def getConcept(text, concept):
+        # Create empty vector to store the tokenized words that need redacting
+    textRedactions = []
+
+    # Create empty vector to store the indeces of the words that need redacting
+    redactions = []
+
+    # Remove newline and tab characters so the nlp similarity method will not throw unwanted 
+    # errors
+    cleanText = text.replace('\n', '')
+    cleanText = cleanText.replace('\t', '')
+
+    # Create string object to store the concept
+    concept = str(concept)
+
+    # Use spacy to perform word tokenization on the cleaned text
+    nlp = spacy.load("en_core_web_lg")
+    doc = nlp(cleanText)
+
+    # Word tokenize the original text
+    originalDoc = nlp(text)
+
+    # Word tokenize the gendered pronouns
+    conceptDoc = nlp(concept)
+
+    # Parse through the word tokens of cleaned text
+    for token1 in doc:
+        # Parse through the word tokens of the gendered pronouns
+        for token2 in conceptDoc:
+            # Check if the similarity of token from text and token from gendered pronouns
+            # is above some threshold and the token from text is not already in textRedactions 
+            if(token1.similarity(token2) > 0.65 and str(token1) not in textRedactions):
+                # Add token from text to textRedactions
+                textRedactions.append(str(token1))
+    
+    # Parse through the word tokens in the original text
+    for token in originalDoc:
+        # Check if the word is in textRedactions
+        if str(token.text) in textRedactions:
+            # Append the index of the word to redactions
+            redactions.append(token.i)
+
+    return redactions
+
 def combineRedactions(redactions1, redactions2):
+    # Concatenate the redaction indices
     redactions = redactions1 + redactions2
+
+    # Remove duplicates using a dictionary
     redactions = list(dict.fromkeys(redactions))
+    
     return redactions
 
 def redact(wordTokenized, redactions):
@@ -146,7 +190,9 @@ wordTok = wordTokenize(example)
 personRedactions = getPersonEntities(example)
 dateRedactions = getDateEntities(example)
 genderedRedactions = getGenderedEntities(example)
+conceptRedactions = getConcept(example, "kids")
 datePersonRedactions = combineRedactions(personRedactions, dateRedactions)
-totalRedactions = combineRedactions(genderedRedactions, datePersonRedactions)
+genderConceptRedactions = combineRedactions(genderedRedactions, conceptRedactions)
+totalRedactions = combineRedactions(genderConceptRedactions, datePersonRedactions)
 text = redact(wordTok, totalRedactions)
 print(text)
