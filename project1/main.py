@@ -1,6 +1,17 @@
 import argparse
 import re
 import spacy
+import glob
+from pathlib import Path
+
+def readTextFile(textFile):
+    # Open the contents of the inputted file
+    inputFile = open('project1/' + str(textFile), mode = "r")
+
+    # Read the contents of the text file
+    text = inputFile.read()
+
+    return text
 
 def wordTokenize(text):
     # Create an empty list to store the word tokens
@@ -20,6 +31,9 @@ def getPersonEntities(text):
     # Create empty vector to store the index of the tokenized words that need redacting
     redactions = []
 
+    # Keep track of how many redactions occur
+    numRedactions = 0
+
     # Use spacy to perform entity recognition on the tokenized words
     nlp = spacy.load("en_core_web_sm")
     doc = nlp(text)
@@ -32,12 +46,18 @@ def getPersonEntities(text):
             # to the redactions list
             for i in range(ent.end - ent.start):
                 redactions.append(i + ent.start)
+            
+            # Increase the number of redactions by 1
+            numRedactions = numRedactions + 1
 
-    return redactions
+    return redactions, numRedactions
 
 def getDateEntities(text):
     # Create empty vector to store the index of the tokenized words that need redacting
     redactions = []
+
+    # Keep track of how many redactions occur
+    numRedactions = 0
 
     # Use spacy to perform entity recognition on the tokenized words
     nlp = spacy.load("en_core_web_sm")
@@ -51,8 +71,11 @@ def getDateEntities(text):
             # to the redactions list
             for i in range(ent.end - ent.start):
                 redactions.append(i + ent.start)
+            
+            # Increase the number of redactions by 1
+            numRedactions = numRedactions + 1
 
-    return redactions
+    return redactions, numRedactions
 
 def getGenderedEntities(text):
     # Create empty vector to store the tokenized words that need redacting
@@ -60,6 +83,9 @@ def getGenderedEntities(text):
 
     # Create empty vector to store the indeces of the words that need redacting
     redactions = []
+
+    # Keep track of how many redactions occur
+    numRedactions = 0
 
     # Remove newline and tab characters so the nlp similarity method will not throw unwanted 
     # errors
@@ -96,14 +122,20 @@ def getGenderedEntities(text):
             # Append the index of the word to redactions
             redactions.append(token.i)
 
-    return redactions
+            # Increase the number of redactions by 1
+            numRedactions = numRedactions + 1
+
+    return redactions, numRedactions
 
 def getConcept(text, concept):
-        # Create empty vector to store the tokenized words that need redacting
+    # Create empty vector to store the tokenized words that need redacting
     textRedactions = []
 
     # Create empty vector to store the indeces of the words that need redacting
     redactions = []
+
+    # Keep track of how many redactions occur
+    numRedactions = 0
 
     # Remove newline and tab characters so the nlp similarity method will not throw unwanted 
     # errors
@@ -140,16 +172,24 @@ def getConcept(text, concept):
             # Append the index of the word to redactions
             redactions.append(token.i)
 
-    return redactions
+            # Increase the number of redactions by 1
+            numRedactions = numRedactions + 1
+
+    return redactions, numRedactions
 
 def combineRedactions(redactions1, redactions2):
     # Concatenate the redaction indices
-    redactions = redactions1 + redactions2
+    redactions = redactions1[0] + redactions2[0]
 
     # Remove duplicates using a dictionary
-    redactions = list(dict.fromkeys(redactions))
-    
-    return redactions
+    uniqueRedactions = list(dict.fromkeys(redactions))
+
+    numCopies = len(redactions) - len(uniqueRedactions)
+
+    # Calculate the total number of redactions for the text without duplicates
+    numRedactions = redactions1[1] + redactions2[1] - numCopies
+
+    return uniqueRedactions, numRedactions
 
 def redact(wordTokenized, redactions):
 
@@ -157,18 +197,18 @@ def redact(wordTokenized, redactions):
     redactedText = ""
 
     # Parse through each redaction index
-    for i in range(len(redactions)):
+    for i in range(len(redactions[0])):
 
         # Create empty vector to store character-for-character full block characters for redacted
         # tokens 
         wordTokChar = ""
 
         # For each character in the word to be redacted, add a full block character to wordTokChar
-        for j in range(len(wordTokenized[redactions[i]])):
+        for j in range(len(wordTokenized[redactions[0][i]])):
             wordTokChar = wordTokChar + u'\u2588'
 
         # Replace the text to be redacted with wordTokChar
-        wordTokenized[redactions[i]] = wordTokChar
+        wordTokenized[redactions[0][i]] = wordTokChar
 
     # Parse through each word in the tokenized list
     for k in range(len(wordTokenized)):
@@ -176,19 +216,32 @@ def redact(wordTokenized, redactions):
         # Concatenate the words to get a string that combines the redacted text and untouched text
         redactedText = redactedText + wordTokenized[k] + " "
 
-    return redactedText
+    return redactedText, redactions[1]
 
-def main(text):
-
+def main(inputFile):
+    text = readTextFile(inputFile)
+    wordTok = wordTokenize(text)
+    personRedactions = getPersonEntities(text)
+    dateRedactions = getDateEntities(text)
+    genderedRedactions = getGenderedEntities(text)
+    conceptRedactions = getConcept(inputFile, "kids")
+    datePersonRedactions = combineRedactions(personRedactions, dateRedactions)
+    genderConceptRedactions = combineRedactions(genderedRedactions, conceptRedactions)
+    totalRedactions = combineRedactions(genderConceptRedactions, datePersonRedactions)
+    finalRedactions = redact(wordTok, totalRedactions)
+    print(finalRedactions[0])
+    print(finalRedactions[1])
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
-    parser.add_argument("--input", type=str, required=True, 
+    parser.add_argument("--input", type=str, required=True, nargs='+',
         help="Text file on which redactions will be implemented.")
-    parser.add_argument("--input", type=str, required=False,
-        help="Other files to on which redactions will be implemented")
-# TODO: Figure out alternate parsers. Writing method for a flag?
-     
+    
     args = parser.parse_args()
-    if args.incidents:
-        main(args.incidents)
+    if args.input:
+        #print(args.input[0])
+        files = []
+        for path in Path('project1').rglob(str(args.input[0])):
+            files.append(path.name)
+        for f in files:
+            main(f)
