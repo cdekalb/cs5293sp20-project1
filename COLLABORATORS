@@ -4,3 +4,7 @@ Stack Overflow, https://stackoverflow.com/questions/8713620/appending-items-to-a
 w3schools, https://www.w3schools.com/python/python_howto_remove_duplicates.asp, Helped me with how to remove duplicates from a list
 guru99, https://www.guru99.com/reading-and-writing-files-in-python.html, Helped me understand how to read text from txt files
 Stack Overflow, https://stackoverflow.com/questions/2186525/how-to-use-glob-to-find-files-recursively, Helped me understand how to implement glob
+spaCy, https://spacy.io/api/annotation#named-entities, Helped me understand how to use entity recognition for date and person redaction
+spaCy, https://spacy.io/usage/vectors-similarity, Helped me understand how to use vector similarity for gender and concept redaction
+mkaz.blog, https://mkaz.blog/code/python-argparse-cookbook/, Helped me understand how to implement flags and arguments in argparse
+Stack Overflow, https://stackoverflow.com/questions/8024248/telling-python-to-save-a-txt-file-to-a-certain-directory-on-windows-and-mac, Helped me understand how to save files to a specific directory

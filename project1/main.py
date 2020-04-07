@@ -3,6 +3,7 @@ import re
 import spacy
 import glob
 from pathlib import Path
+import os
 
 def readTextFile(textFile):
     # Open the contents of the inputted file
@@ -178,16 +179,45 @@ def getConcept(text, concept):
     return redactions, numRedactions
 
 def combineRedactions(redactions1, redactions2):
-    # Concatenate the redaction indices
-    redactions = redactions1[0] + redactions2[0]
+    if len(redactions1) != 0 and len(redactions2) != 0:
+        # Concatenate the redaction indices
+        redactions = redactions1[0] + redactions2[0]
 
-    # Remove duplicates using a dictionary
-    uniqueRedactions = list(dict.fromkeys(redactions))
+        # Remove duplicates using a dictionary
+        uniqueRedactions = list(dict.fromkeys(redactions))
 
-    numCopies = len(redactions) - len(uniqueRedactions)
+        numCopies = len(redactions) - len(uniqueRedactions)
 
-    # Calculate the total number of redactions for the text without duplicates
-    numRedactions = redactions1[1] + redactions2[1] - numCopies
+        # Calculate the total number of redactions for the text without duplicates
+        numRedactions = redactions1[1] + redactions2[1] - numCopies
+
+    elif len(redactions1) == 0 and len(redactions2) != 0:
+        # Concatenate the redaction indices
+        redactions = redactions2[0]
+
+        # Remove duplicates using a dictionary
+        uniqueRedactions = list(dict.fromkeys(redactions))
+
+        numCopies = len(redactions) - len(uniqueRedactions)
+
+        # Calculate the total number of redactions for the text without duplicates
+        numRedactions = redactions2[1] - numCopies
+
+    elif len(redactions2) == 0 and len(redactions1) != 0:
+        # Concatenate the redaction indices
+        redactions = redactions1[0]
+
+        # Remove duplicates using a dictionary
+        uniqueRedactions = list(dict.fromkeys(redactions))
+
+        numCopies = len(redactions) - len(uniqueRedactions)
+
+        # Calculate the total number of redactions for the text without duplicates
+        numRedactions = redactions1[1] - numCopies
+
+    else:
+        uniqueRedactions = []
+        numRedactions = 0
 
     return uniqueRedactions, numRedactions
 
@@ -205,7 +235,7 @@ def redact(wordTokenized, redactions):
 
         # For each character in the word to be redacted, add a full block character to wordTokChar
         for j in range(len(wordTokenized[redactions[0][i]])):
-            wordTokChar = wordTokChar + u'\u2588'
+            wordTokChar = wordTokChar + '_'
 
         # Replace the text to be redacted with wordTokChar
         wordTokenized[redactions[0][i]] = wordTokChar
@@ -218,30 +248,169 @@ def redact(wordTokenized, redactions):
 
     return redactedText, redactions[1]
 
-def main(inputFile):
+def main(inputFile, names, dates, gender, concept, conceptId, stats, output, outputPath):
+    # Read in the text file
     text = readTextFile(inputFile)
+
+    # Word tokenize the text
     wordTok = wordTokenize(text)
-    personRedactions = getPersonEntities(text)
-    dateRedactions = getDateEntities(text)
-    genderedRedactions = getGenderedEntities(text)
-    conceptRedactions = getConcept(inputFile, "kids")
+
+    # If names flag is given
+    if names:
+        # Get the person entities and corresponding indices of the redactions
+        personRedactions = getPersonEntities(text)
+
+        # Get the number of name redactions
+        numPersonRedactions = personRedactions[1]
+    else:
+        # Leave name redactions object empty
+        personRedactions = []
+
+    # If dates flag is given
+    if dates:
+        # Get the date entities and corresponding indices of the redactions
+        dateRedactions = getDateEntities(text)
+
+        # Get the number of date redactions
+        numDateRedactions = dateRedactions[1]
+    else:
+        # Leave date redactions object empty
+        dateRedactions = []
+
+    # If gender flag is given
+    if gender:
+        # Get the gendered words and corresponding indices of the redactions
+        genderedRedactions = getGenderedEntities(text)
+
+        # Get the number of gendered word redactions
+        numGenderedRedactions = genderedRedactions[1]
+    else:
+        # Leave gendered words object empty
+        genderedRedactions = []
+    
+    # If concept flag is given
+    if concept:
+        # Get the concept words and corresponding indices of the redactions
+        conceptRedactions = getConcept(inputFile, conceptId)
+
+        # Get the number of concept word redactions
+        numConceptRedactions = conceptRedactions[1]
+    else:
+        # Leave the concept words object empty
+        conceptRedactions = []
+    
+    # Combine the date and person redaction lists
     datePersonRedactions = combineRedactions(personRedactions, dateRedactions)
+
+    # Combine the gender and concept redaction lists
     genderConceptRedactions = combineRedactions(genderedRedactions, conceptRedactions)
+
+    # Combine all of the redaction lists
     totalRedactions = combineRedactions(genderConceptRedactions, datePersonRedactions)
+
+    # Perform the redaction
     finalRedactions = redact(wordTok, totalRedactions)
-    print(finalRedactions[0])
-    print(finalRedactions[1])
+
+    # If output flag is given
+    if output:
+        # Add the required file extension for the redactions to be saved in
+        outputFileName = inputFile + ".redacted"
+
+        # Get the path of the main file
+        pathName = os.path.dirname(os.path.realpath("project1/main.py"))
+
+        # Create the path into which the redacted files will be saved
+        completeSavePath = os.path.join(pathName, outputPath, outputFileName)
+
+        # Open a newly created file
+        file1 = open(completeSavePath, "w")
+
+        # Write the redacted text
+        file1.write(str(finalRedactions[0]))
+
+        # If stats flag is given
+        if stats:
+            # Create strings that provide the given stats
+            personStr = "\nNumber of name redactions: " + str(numPersonRedactions) + "\n"
+            dateStr = "Number of date redactions: " + str(numDateRedactions) + "\n"
+            genderStr = "Number of genedered word redactions: " + str(numGenderedRedactions) + "\n"
+            conceptStr = "Number of concept redactions: " + str(numConceptRedactions) + "\n"
+            totalRedactStr = "Total number of redactions: " + str(finalRedactions[1]) + "\n"
+
+            # Write each of the stats strings to the file
+            file1.write(personStr)
+            file1.write(dateStr)
+            file1.write(genderStr)
+            file1.write(conceptStr)
+            file1.write(totalRedactStr)
+
+        # Close the file
+        file1.close()
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
-    parser.add_argument("--input", type=str, required=True, nargs='+',
-        help="Text file on which redactions will be implemented.")
     
+    # Add the required parser arguments
+    parser.add_argument("--input", type=str, required=True, nargs='+',
+        help="Text files on which redactions will be implemented.")
+    parser.add_argument("--names", action='store_true', help="Chosen if names are to be redacted")
+    parser.add_argument("--dates", action='store_true', help="Chosen if dates are to be redacted")
+    parser.add_argument("--gender", action='store_true', help="Chosen if gendered words are to be redacted")
+    parser.add_argument("--concept", type=str, help="Chosen if a concept is to be redacted")
+    parser.add_argument("--output", type=str, required=True,
+    help="The path of the program output")
+    parser.add_argument("--stats", action='store_true', 
+    help="Chosen if resulting statistics are desired")
+
     args = parser.parse_args()
+
+    # For the flags provided, set their corresponding boolean variables to true
+    if args.names:
+        names = True
+    else:
+        names = False
+
+    if args.dates:
+        dates = True
+    else:
+        dates = False
+    
+    if args.gender:
+        gender = True
+    else:
+        gender = False
+
+    if args.concept:
+        concept = True
+        # Store the conceptId
+        conceptId = args.concept[0]
+    else:
+        concept = False
+        # Leave the conceptId empty
+        conceptId = ''
+
+    if args.output:
+        output = True
+        # Store the provided output path
+        outputPath = str(args.output)
+    else:
+        output = False
+        # Leave the output path empty
+        outputPath = ''
+
+    if args.stats:
+        stats = True
+    else:
+        stats = False
+
     if args.input:
-        #print(args.input[0])
+        # Create empty list to store the inputted files
         files = []
+
+        # Add the inputted files to the list
         for path in Path('project1').rglob(str(args.input[0])):
             files.append(path.name)
+
+        # Parse through the inputted files
         for f in files:
-            main(f)
+            main(f, names, dates, gender, concept, conceptId, stats, output, outputPath)

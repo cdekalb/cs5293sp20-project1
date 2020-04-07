@@ -2,6 +2,7 @@ import re
 import spacy
 import glob
 from pathlib import Path
+import os
 # python -m spacy download en_core_web_sm
 # python -m spacy download en_core_web_lg
 
@@ -226,7 +227,9 @@ def readTextFile(textFile):
 
     return text
 
-example = readTextFile('example.txt')
+numPersonRedactions = 5
+personStr = "Number of name redactions: " + str(numPersonRedactions)
+precticeText = str("Text:", example)
 wordTok = wordTokenize(example)
 personRedactions = getPersonEntities(example)
 dateRedactions = getDateEntities(example)
@@ -236,5 +239,6 @@ datePersonRedactions = combineRedactions(personRedactions, dateRedactions)
 genderConceptRedactions = combineRedactions(genderedRedactions, conceptRedactions)
 totalRedactions = combineRedactions(genderConceptRedactions, datePersonRedactions)
 finalRedactions = redact(wordTok, totalRedactions)
+finalOutput = str(finalRedactions[0])
 print(finalRedactions[0])
 print(finalRedactions[1])
